@@ -1,0 +1,22 @@
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Settings
+project_name = "picker-scheduler"
+environment  = "prod"
+
+# EC2 Configuration
+ec2_instance_type = "t3.micro"  # Free tier eligible
+ec2_key_name      = "your-key-pair-name"  # Name of your AWS key pair
+
+# RDS Configuration
+db_instance_class = "db.t3.micro"  # Free tier eligible
+db_name           = "picker_scheduler"
+db_username       = "postgres"
+db_password       = "your-secure-database-password"  # Change this!
+
+# Application Configuration
+jwt_secret_key = "your-super-secret-jwt-key-change-this-in-production"  # Change this!
+
+# Domain (optional - leave empty if not using custom domain)
+domain_name = ""

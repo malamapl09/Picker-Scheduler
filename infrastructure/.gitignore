@@ -1,0 +1,18 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+*.tfplan
+
+# SSL certificates
+nginx/ssl/
+
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
