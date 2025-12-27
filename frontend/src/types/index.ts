@@ -181,6 +181,7 @@ export interface GeneratedShift {
   end_time: string
   break_minutes: number
   working_hours: number
+  hours?: number  // Alias for working_hours
 }
 
 export interface OptimizationStats {
