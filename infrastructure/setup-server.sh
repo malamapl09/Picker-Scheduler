@@ -20,13 +20,9 @@ echo "Installing Node.js..."
 curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
 sudo dnf install -y nodejs
 
-# Install Python 3.11
+# Install Python 3.11 (don't change system python3 symlink - it breaks dnf)
 echo "Installing Python..."
 sudo dnf install -y python3.11 python3.11-pip python3.11-devel gcc postgresql-devel
-
-# Create symlinks
-sudo ln -sf /usr/bin/python3.11 /usr/bin/python3
-sudo ln -sf /usr/bin/pip3.11 /usr/bin/pip3
 
 # Pull latest code
 echo "Pulling latest code..."
@@ -39,7 +35,7 @@ cd /opt/picker-scheduler/backend
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
+    python3.11 -m venv venv
 fi
 
 # Install dependencies

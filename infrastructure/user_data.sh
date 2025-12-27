@@ -12,12 +12,8 @@ dnf update -y
 curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
 dnf install -y nodejs
 
-# Install Python 3.11 and pip
+# Install Python 3.11 and pip (don't change system python3 symlink - it breaks dnf)
 dnf install -y python3.11 python3.11-pip python3.11-devel git
-
-# Create symlinks
-ln -sf /usr/bin/python3.11 /usr/bin/python3
-ln -sf /usr/bin/pip3.11 /usr/bin/pip3
 
 # Install build dependencies for Python packages
 dnf install -y gcc postgresql-devel
@@ -45,7 +41,7 @@ echo "Setting up backend..."
 cd /opt/picker-scheduler/backend
 
 # Create virtual environment
-sudo -u ec2-user python3 -m venv venv
+sudo -u ec2-user python3.11 -m venv venv
 
 # Install Python dependencies
 sudo -u ec2-user /opt/picker-scheduler/backend/venv/bin/pip install --upgrade pip
