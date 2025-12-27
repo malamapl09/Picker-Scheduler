@@ -115,11 +115,10 @@ export default function NewSchedulePage() {
     setError(null)
 
     try {
-      // Create a new schedule
+      // Create a new schedule (defaults to 'draft' status)
       const schedule = await schedulesApi.create({
         store_id: selectedStore,
-        week_start_date: selectedWeek,
-        status: 'draft'
+        week_start_date: selectedWeek
       })
 
       // Apply the optimization result
