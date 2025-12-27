@@ -97,7 +97,7 @@ export default function NewSchedulePage() {
     setError(null)
 
     try {
-      const result = await optimizer.generate(selectedStore, selectedWeek)
+      const result = await optimizer.generate({ store_id: selectedStore, week_start: selectedWeek })
       setOptimizationResult(result)
       setCurrentStep('review')
     } catch (err: any) {
