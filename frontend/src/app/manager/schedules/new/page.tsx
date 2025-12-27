@@ -385,7 +385,7 @@ export default function NewSchedulePage() {
               <div className="p-4 bg-green-50 rounded-lg">
                 <p className="text-sm text-green-600">Coverage Score</p>
                 <p className="text-2xl font-bold text-green-900">
-                  {optimizationResult.stats?.coverage_score?.toFixed(0) || '0'}%
+                  {optimizationResult.stats?.coverage_percent?.toFixed(0) || '0'}%
                 </p>
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
