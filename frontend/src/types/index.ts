@@ -227,6 +227,8 @@ export interface WeeklyForecast {
   store_id: number
   week_start: string
   total_predicted_orders: number
+  total_orders?: number  // Alias used in some API responses
+  total_required_hours?: number
   method: string
   daily_forecasts: DailyForecast[]
   warnings: string[]
