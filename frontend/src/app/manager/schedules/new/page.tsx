@@ -77,7 +77,7 @@ export default function NewSchedulePage() {
 
       if (!forecastData) {
         // Generate forecast
-        forecastData = await forecasts.generate(selectedStore, selectedWeek)
+        forecastData = await forecasts.generate({ store_id: selectedStore, week_start: selectedWeek })
       }
 
       setForecast(forecastData)
