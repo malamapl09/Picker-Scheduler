@@ -82,9 +82,16 @@ export const stores = {
     const response = await api.get(`/stores/${id}`)
     return response.data
   },
-  create: async (data: { name: string; code: string; address?: string }) => {
+  create: async (data: { name: string; code: string; address?: string; operating_start?: string; operating_end?: string }) => {
     const response = await api.post('/stores', data)
     return response.data
+  },
+  update: async (id: number, data: { name?: string; address?: string; operating_start?: string; operating_end?: string }) => {
+    const response = await api.patch(`/stores/${id}`, data)
+    return response.data
+  },
+  delete: async (id: number) => {
+    await api.delete(`/stores/${id}`)
   },
 }
 
