@@ -220,6 +220,7 @@ export interface DailyForecast {
   total_orders: number
   peak_hour: number
   peak_orders: number
+  total_picker_hours?: number
   hourly: HourlyForecast[]
 }
 
