@@ -31,6 +31,7 @@ interface TrendData {
   labor_cost: number
   efficiency_score: number
   coverage_score: number
+  forecasted_orders: number
   hours_change?: number
   cost_change?: number
   efficiency_change?: number
