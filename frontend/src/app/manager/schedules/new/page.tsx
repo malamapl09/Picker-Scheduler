@@ -122,7 +122,7 @@ export default function NewSchedulePage() {
       })
 
       // Apply the optimization result
-      await optimizer.apply(schedule.id, optimizationResult.shifts)
+      await optimizer.apply(selectedStore, selectedWeek, optimizationResult.shifts)
 
       setCreatedScheduleId(schedule.id)
       setCurrentStep('complete')
