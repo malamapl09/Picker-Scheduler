@@ -169,6 +169,7 @@ export interface OptimizationResult {
   shifts: GeneratedShift[]
   stats: OptimizationStats
   warnings: string[]
+  compliance_issues?: string[]
   schedule_id?: number
 }
 
