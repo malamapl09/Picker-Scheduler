@@ -1,0 +1,16 @@
+[Unit]
+Description=Picker Scheduler Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/picker-scheduler/backend
+Environment=PATH=/opt/picker-scheduler/backend/venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/opt/picker-scheduler/.env
+ExecStart=/opt/picker-scheduler/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

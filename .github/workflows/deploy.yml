@@ -20,16 +20,22 @@ jobs:
             cd /opt/picker-scheduler
 
             # Pull latest changes
-            sudo git pull origin main
+            git pull origin main
 
-            # Rebuild and restart containers
-            sudo docker-compose -f docker-compose.prod.yml build --build-arg NEXT_PUBLIC_API_URL=http://${{ secrets.EC2_HOST }}:8000
-            sudo docker-compose -f docker-compose.prod.yml up -d
+            # Update backend
+            cd /opt/picker-scheduler/backend
+            source venv/bin/activate
+            pip install -r requirements.txt
+            alembic upgrade head
+            deactivate
 
-            # Run migrations
-            sudo docker-compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+            # Update frontend
+            cd /opt/picker-scheduler/frontend
+            npm install
+            npm run build
 
-            # Clean up old images
-            sudo docker image prune -f
+            # Restart services
+            sudo systemctl restart picker-backend
+            sudo systemctl restart picker-frontend
 
             echo "Deployment complete!"

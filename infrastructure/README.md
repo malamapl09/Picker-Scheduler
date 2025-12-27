@@ -1,4 +1,4 @@
-# AWS Deployment Guide
+# AWS Deployment Guide (Native - No Docker)
 
 This guide walks you through deploying the Picker Scheduling System to AWS using Terraform.
 
@@ -12,55 +12,39 @@ This guide walks you through deploying the Picker Scheduling System to AWS using
 │  │                                                        │  │
 │  │   ┌─────────────────────┐    ┌──────────────────────┐ │  │
 │  │   │   EC2 (t3.micro)    │    │   RDS PostgreSQL     │ │  │
-│  │   │   ┌─────────────┐   │    │   (db.t3.micro)      │ │  │
-│  │   │   │  Frontend   │   │    │                      │ │  │
-│  │   │   │  (Next.js)  │   │───▶│  picker_scheduler    │ │  │
-│  │   │   │  :3000      │   │    │  :5432               │ │  │
-│  │   │   ├─────────────┤   │    │                      │ │  │
-│  │   │   │  Backend    │   │    │  Automated backups   │ │  │
-│  │   │   │  (FastAPI)  │   │    │  7-day retention     │ │  │
-│  │   │   │  :8000      │   │    └──────────────────────┘ │  │
-│  │   │   └─────────────┘   │                              │  │
-│  │   │                     │                              │  │
-│  │   │   Elastic IP        │                              │  │
+│  │   │                     │    │   (db.t3.micro)      │ │  │
+│  │   │  ┌───────────────┐  │    │                      │ │  │
+│  │   │  │ Next.js :3000 │  │───▶│  picker_scheduler    │ │  │
+│  │   │  ├───────────────┤  │    │  :5432               │ │  │
+│  │   │  │ FastAPI :8000 │  │    │                      │ │  │
+│  │   │  └───────────────┘  │    │  Automated backups   │ │  │
+│  │   │                     │    └──────────────────────┘ │  │
+│  │   │  systemd services   │                              │  │
 │  │   └─────────────────────┘                              │  │
 │  │                                                        │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Prerequisites
+## Cost: $0/month (AWS Free Tier)
 
-1. **AWS Account** with Free Tier eligibility
-2. **AWS CLI** installed and configured
-3. **Terraform** installed (v1.0+)
-4. **SSH Key Pair** in AWS
-
-## Cost Estimate (Free Tier)
-
-| Resource | Free Tier Allowance | Monthly Cost |
-|----------|---------------------|--------------|
-| EC2 t3.micro | 750 hours | $0 |
-| RDS db.t3.micro | 750 hours | $0 |
-| EBS Storage | 30 GB | $0 |
-| RDS Storage | 20 GB | $0 |
-| Elastic IP | Free when attached | $0 |
-| **Total** | | **$0** |
-
-> Note: Free tier lasts 12 months from AWS account creation.
+| Resource | Free Tier Allowance |
+|----------|---------------------|
+| EC2 t3.micro | 750 hours/month |
+| RDS db.t3.micro | 750 hours/month |
+| EBS Storage | 30 GB |
+| RDS Storage | 20 GB |
 
 ## Deployment Steps
 
-### 1. Create SSH Key Pair (if you don't have one)
+### 1. Create SSH Key Pair
 
 ```bash
-# Create key pair in AWS
 aws ec2 create-key-pair \
   --key-name picker-scheduler-key \
   --query 'KeyMaterial' \
   --output text > ~/.ssh/picker-scheduler-key.pem
 
-# Set correct permissions
 chmod 400 ~/.ssh/picker-scheduler-key.pem
 ```
 
@@ -68,62 +52,27 @@ chmod 400 ~/.ssh/picker-scheduler-key.pem
 
 ```bash
 cd infrastructure
-
-# Copy the example tfvars file
 cp terraform.tfvars.example terraform.tfvars
-
-# Edit with your values
-nano terraform.tfvars
+# Edit terraform.tfvars with your values
 ```
 
-**Required values to change:**
-- `ec2_key_name`: Name of your SSH key pair
-- `db_password`: Strong database password
-- `jwt_secret_key`: Random secret for JWT tokens
-
-Generate secure passwords:
-```bash
-# Generate random password
-openssl rand -base64 32
-```
-
-### 3. Initialize and Deploy
+### 3. Deploy
 
 ```bash
-# Initialize Terraform
 terraform init
-
-# Preview the changes
-terraform plan
-
-# Deploy (takes ~10-15 minutes)
 terraform apply
 ```
 
-### 4. Wait for Setup
+Wait 10-15 minutes for setup to complete.
 
-After `terraform apply` completes, wait 5-10 minutes for:
-- EC2 instance to boot
-- Docker to install
-- Application to build and start
-- Database migrations to run
+### 4. Access Your Application
 
-### 5. Access Your Application
+- **Frontend**: http://<PUBLIC_IP>:3000
+- **API Docs**: http://<PUBLIC_IP>:8000/docs
 
-Terraform will output the URLs:
-```
-frontend_url = "http://X.X.X.X:3000"
-backend_url = "http://X.X.X.X:8000"
-api_docs_url = "http://X.X.X.X:8000/docs"
-```
+## Managing the Deployment
 
-Default login credentials:
-- **Manager**: `manager@example.com` / `manager123`
-- **Employee**: Check seeded data
-
-## Managing Your Deployment
-
-### SSH into the Server
+### SSH into Server
 
 ```bash
 ssh -i ~/.ssh/picker-scheduler-key.pem ec2-user@<PUBLIC_IP>
@@ -132,104 +81,66 @@ ssh -i ~/.ssh/picker-scheduler-key.pem ec2-user@<PUBLIC_IP>
 ### View Logs
 
 ```bash
-# All logs
-cd /opt/picker-scheduler
-docker-compose -f docker-compose.prod.yml logs -f
+# Backend logs
+sudo journalctl -u picker-backend -f
 
-# Backend only
-docker-compose -f docker-compose.prod.yml logs -f backend
-
-# Frontend only
-docker-compose -f docker-compose.prod.yml logs -f frontend
+# Frontend logs
+sudo journalctl -u picker-frontend -f
 ```
 
-### Restart Application
+### Restart Services
 
 ```bash
-cd /opt/picker-scheduler
-docker-compose -f docker-compose.prod.yml restart
+sudo systemctl restart picker-backend
+sudo systemctl restart picker-frontend
 ```
 
-### Update Application
+### Manual Update
 
 ```bash
 cd /opt/picker-scheduler
 git pull
-docker-compose -f docker-compose.prod.yml up -d --build
+
+# Backend
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+deactivate
+
+# Frontend
+cd ../frontend
+npm install
+npm run build
+
+# Restart
+sudo systemctl restart picker-backend picker-frontend
 ```
 
-### Run Database Migrations
+## Auto-Deploy with GitHub Actions
+
+Push to `main` branch triggers automatic deployment.
+
+### Setup (one-time)
+
+1. Go to https://github.com/YOUR_REPO/settings/secrets/actions
+2. Add secrets:
+   - `EC2_HOST`: Your EC2 public IP
+   - `EC2_SSH_KEY`: Contents of your .pem file
+
+## Converting Existing Docker Deployment
+
+If you have an existing Docker-based deployment, run:
 
 ```bash
+ssh -i ~/.ssh/picker-scheduler-key.pem ec2-user@<PUBLIC_IP>
 cd /opt/picker-scheduler
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+chmod +x infrastructure/setup-server.sh
+./infrastructure/setup-server.sh
 ```
-
-## Troubleshooting
-
-### Check User Data Script Logs
-
-```bash
-sudo cat /var/log/user-data.log
-```
-
-### Check Docker Status
-
-```bash
-sudo systemctl status docker
-docker ps
-```
-
-### Check Application Status
-
-```bash
-cd /opt/picker-scheduler
-docker-compose -f docker-compose.prod.yml ps
-```
-
-### Common Issues
-
-1. **Application not accessible after deployment**
-   - Wait 5-10 minutes for full setup
-   - Check security group allows ports 3000, 8000
-   - Check user data logs for errors
-
-2. **Database connection errors**
-   - Verify RDS is in "Available" state
-   - Check security group allows PostgreSQL from EC2
-
-3. **Out of memory**
-   - t3.micro has 1GB RAM - may need t3.small for heavy load
 
 ## Cleanup
-
-To destroy all resources and avoid charges:
 
 ```bash
 terraform destroy
 ```
-
-## Adding a Custom Domain (Optional)
-
-1. Register domain in Route 53 or use external registrar
-2. Create an A record pointing to the Elastic IP
-3. Update nginx config for your domain
-4. Add SSL with Let's Encrypt:
-
-```bash
-# On EC2 instance
-sudo dnf install -y certbot
-sudo certbot certonly --standalone -d your-domain.com
-```
-
-## Security Recommendations
-
-For production use:
-
-1. [ ] Change default passwords
-2. [ ] Enable RDS deletion protection
-3. [ ] Set up CloudWatch alarms
-4. [ ] Enable VPC Flow Logs
-5. [ ] Use AWS Secrets Manager for credentials
-6. [ ] Set up SSL/HTTPS
-7. [ ] Restrict SSH access to your IP only

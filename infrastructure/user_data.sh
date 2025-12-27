@@ -8,116 +8,77 @@ echo "Starting user data script at $(date)"
 # Update system
 dnf update -y
 
-# Install Docker
-dnf install -y docker git
+# Install Node.js 20
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+dnf install -y nodejs
 
-# Start and enable Docker
-systemctl start docker
-systemctl enable docker
+# Install Python 3.11 and pip
+dnf install -y python3.11 python3.11-pip python3.11-devel git
 
-# Install Docker Compose
-DOCKER_COMPOSE_VERSION="v2.24.0"
-curl -L "https://github.com/docker/compose/releases/download/$${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+# Create symlinks
+ln -sf /usr/bin/python3.11 /usr/bin/python3
+ln -sf /usr/bin/pip3.11 /usr/bin/pip3
 
-# Add ec2-user to docker group
-usermod -aG docker ec2-user
+# Install build dependencies for Python packages
+dnf install -y gcc postgresql-devel
 
 # Create app directory
-mkdir -p /opt/${project_name}
-cd /opt/${project_name}
+mkdir -p /opt/picker-scheduler
+chown ec2-user:ec2-user /opt/picker-scheduler
+cd /opt/picker-scheduler
 
-# Clone the repository
-git clone https://github.com/malamapl09/Picker-Scheduler.git .
+# Clone the repository as ec2-user
+sudo -u ec2-user git clone https://github.com/malamapl09/Picker-Scheduler.git .
 
-# Create production environment file for backend
-cat > /opt/${project_name}/backend/.env << 'ENVFILE'
+# Create environment file
+cat > /opt/picker-scheduler/.env << 'ENVFILE'
 DATABASE_URL=postgresql://${db_username}:${db_password}@${db_host}:${db_port}/${db_name}
 SECRET_KEY=${jwt_secret_key}
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ENVIRONMENT=production
 DEBUG=false
 ENVFILE
+chown ec2-user:ec2-user /opt/picker-scheduler/.env
 
-# Create production environment file for frontend
-cat > /opt/${project_name}/frontend/.env.local << 'ENVFILE'
-NEXT_PUBLIC_API_URL=http://localhost:8000
-ENVFILE
+# Setup Backend
+echo "Setting up backend..."
+cd /opt/picker-scheduler/backend
 
-# Create production docker-compose override
-cat > /opt/${project_name}/docker-compose.prod.yml << 'COMPOSEFILE'
-version: '3.8'
+# Create virtual environment
+sudo -u ec2-user python3 -m venv venv
 
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://${db_username}:${db_password}@${db_host}:${db_port}/${db_name}
-      - SECRET_KEY=${jwt_secret_key}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    depends_on:
-      - backend
-    restart: always
-COMPOSEFILE
-
-# Build and start the application
-cd /opt/${project_name}
-docker-compose -f docker-compose.prod.yml build
-docker-compose -f docker-compose.prod.yml up -d
-
-# Wait for backend to be ready
-echo "Waiting for backend to be ready..."
-sleep 30
+# Install Python dependencies
+sudo -u ec2-user /opt/picker-scheduler/backend/venv/bin/pip install --upgrade pip
+sudo -u ec2-user /opt/picker-scheduler/backend/venv/bin/pip install -r requirements.txt
 
 # Run database migrations
-docker-compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+sudo -u ec2-user /opt/picker-scheduler/backend/venv/bin/alembic upgrade head
 
-# Seed initial data (if needed)
-docker-compose -f docker-compose.prod.yml exec -T backend python -c "from app.scripts.seed_data import seed_all; seed_all()" || true
+# Setup Frontend
+echo "Setting up frontend..."
+cd /opt/picker-scheduler/frontend
 
-# Create systemd service for docker-compose
-cat > /etc/systemd/system/${project_name}.service << 'SERVICEFILE'
-[Unit]
-Description=${project_name} Docker Compose Application
-Requires=docker.service
-After=docker.service
+# Install Node dependencies
+sudo -u ec2-user npm install
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/${project_name}
-ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d
-ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
-TimeoutStartSec=0
+# Build for production
+sudo -u ec2-user npm run build
 
-[Install]
-WantedBy=multi-user.target
-SERVICEFILE
+# Install systemd services
+cp /opt/picker-scheduler/infrastructure/systemd/picker-backend.service /etc/systemd/system/
+cp /opt/picker-scheduler/infrastructure/systemd/picker-frontend.service /etc/systemd/system/
 
-# Enable the service
+# Reload systemd and enable services
 systemctl daemon-reload
-systemctl enable ${project_name}.service
+systemctl enable picker-backend picker-frontend
+systemctl start picker-backend
+sleep 5
+systemctl start picker-frontend
+
+# Seed initial data
+echo "Seeding database..."
+cd /opt/picker-scheduler/backend
+sudo -u ec2-user /opt/picker-scheduler/backend/venv/bin/python -m app.scripts.seed_data || true
 
 echo "User data script completed at $(date)"
 echo "Application should be available at:"
