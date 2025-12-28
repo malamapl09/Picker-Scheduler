@@ -2,22 +2,45 @@
 
 A workforce scheduling and labor optimization system for online order pickers across retail stores.
 
-## Features
+## Overview
 
-- **Demand Forecasting**: Predict order volume by store/hour using historical data
-- **Schedule Optimization**: Auto-generate schedules using Google OR-Tools
-- **Compliance Engine**: Enforce labor rules (44hr/week, 8hr/day, 6-on-1-off)
-- **Manager Portal**: Create, edit, and publish schedules
-- **Employee Portal**: View schedules, submit availability, request time off
-- **Reporting**: Labor efficiency, coverage scores, compliance metrics
+The Picker Scheduling System automates the creation of work schedules for 50+ employees across 24 retail locations. It replaces manual spreadsheet-based scheduling with a demand-driven system that:
+
+- **Forecasts** order volume by store and hour using historical transaction data
+- **Generates** optimized schedules matching staffing to predicted demand
+- **Enforces** compliance with labor rules automatically
+- **Provides** self-service portals for managers and employees
+
+## Key Features
+
+### For Managers
+- **Schedule Optimizer** - Auto-generate schedules using Google OR-Tools
+- **Demand Forecasting** - Predict order volume by store/hour
+- **Coverage Analysis** - Visualize understaffed/overstaffed periods
+- **Call-Out Management** - Quickly find replacement workers
+- **Reporting Dashboard** - Labor costs, efficiency, compliance metrics
+
+### For Employees
+- **Schedule View** - See upcoming shifts at a glance
+- **Availability Management** - Set preferred working hours
+- **Time-Off Requests** - Request days off with approval workflow
+- **Shift Swaps** - Trade shifts with coworkers
+
+### Compliance Engine
+- 44 hours/week maximum
+- 8 hours/day maximum
+- 6 days on, 1 day off pattern
+- Automatic break scheduling
 
 ## Tech Stack
 
-- **Backend**: Python + FastAPI
-- **Frontend**: Next.js 14 (React)
-- **Database**: PostgreSQL
-- **Optimizer**: Google OR-Tools
-- **Auth**: JWT
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS |
+| Backend | Python 3.11+, FastAPI |
+| Database | PostgreSQL 14+ |
+| Optimizer | Google OR-Tools |
+| Auth | JWT (JSON Web Tokens) |
 
 ## Quick Start
 
@@ -31,149 +54,90 @@ A workforce scheduling and labor optimization system for online order pickers ac
 
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/your-username/picker-scheduler.git
 cd picker-scheduler
 
 # Start all services
 docker-compose up -d
 
-# Backend API will be available at http://localhost:8000
-# Frontend will be available at http://localhost:3000
+# Run database migrations
+docker-compose exec backend alembic upgrade head
 ```
+
+Access the application:
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
 
 ### Local Development
 
-#### Backend
+See the [Deployment Guide](docs/deployment.md) for detailed local setup instructions.
 
-```bash
-cd backend
+## Documentation
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment file
-cp .env.example .env
-
-# Start PostgreSQL (via Docker)
-docker-compose up -d db
-
-# Run migrations
-alembic upgrade head
-
-# Start the server
-uvicorn app.main:app --reload
-```
-
-#### Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
+| Document | Description |
+|----------|-------------|
+| [API Reference](docs/api/README.md) | Complete API endpoint documentation |
+| [Manager Guide](docs/guides/manager-guide.md) | How to use the manager portal |
+| [Employee Guide](docs/guides/employee-guide.md) | How to use the employee portal |
+| [Architecture](docs/architecture/README.md) | System design and technical details |
+| [Deployment Guide](docs/deployment.md) | Production deployment instructions |
+| [AWS Infrastructure](infrastructure/README.md) | Terraform deployment to AWS |
 
 ## Project Structure
 
 ```
 picker-scheduler/
-├── backend/
+├── backend/                 # FastAPI backend
 │   ├── app/
 │   │   ├── api/routes/      # API endpoints
 │   │   ├── models/          # SQLAlchemy models
 │   │   ├── schemas/         # Pydantic schemas
-│   │   ├── services/        # Business logic
+│   │   ├── services/        # Business logic (optimizer, forecaster)
 │   │   └── core/            # Config, security, database
 │   ├── alembic/             # Database migrations
 │   └── tests/
-├── frontend/
+├── frontend/                # Next.js frontend
 │   ├── src/
-│   │   ├── app/             # Next.js pages
-│   │   ├── components/      # React components
+│   │   ├── app/             # Pages (manager/, employee/)
+│   │   ├── components/      # Reusable UI components
 │   │   ├── lib/             # API client, auth
-│   │   └── types/           # TypeScript types
-│   └── public/
-├── data/                    # Sample data
+│   │   └── types/           # TypeScript interfaces
+├── infrastructure/          # Terraform AWS deployment
+├── docs/                    # Documentation
 └── docker-compose.yml
 ```
 
-## API Documentation
-
-Once the backend is running, visit:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## Key Endpoints
+## API Overview
 
 | Endpoint | Description |
 |----------|-------------|
-| `POST /api/auth/login` | Login and get JWT token |
+| `POST /api/auth/login` | Authenticate and get JWT token |
 | `GET /api/stores` | List all stores |
 | `GET /api/employees` | List employees |
-| `GET /api/schedules` | List schedules |
-| `POST /api/schedules` | Create a new schedule |
-| `POST /api/schedules/{id}/publish` | Publish a schedule |
-| `GET /api/shifts` | List shifts |
-| `GET /api/availability/employee/{id}` | Get employee availability |
-| `GET /api/reports/labor-summary` | Get labor metrics |
-| `POST /api/data/import/employees` | Bulk import employees |
-| `POST /api/data/import/historical-orders` | Import historical order data |
-| `POST /api/data/import/availability` | Import employee availability |
-| `GET /api/data/export/employees` | Export employees to CSV/Excel |
-| `GET /api/data/export/schedule/{id}` | Export schedule to CSV/Excel |
-| `GET /api/data/export/labor-report` | Export labor report |
+| `POST /api/schedules` | Create new schedule |
+| `POST /api/optimizer/generate` | Generate optimized schedule |
+| `POST /api/forecasts/generate` | Generate demand forecast |
+| `GET /api/reports/*` | Access various reports |
+
+Full API documentation available at `/docs` when running the backend.
 
 ## Data Import/Export
 
-The system supports bulk data import and export via CSV or Excel files.
+Bulk import employees, historical orders, and availability via CSV or Excel files.
 
-### Import Templates
-
-Download templates from the Data Management page or use these formats:
-
-**Employees Import (`/api/data/import/employees`)**
+**Employee Import Format:**
 ```csv
 first_name,last_name,email,store_code,hire_date,status
-John,Doe,john.doe@example.com,DT001,2024-01-15,active
-Jane,Smith,jane.smith@example.com,DT001,2024-02-20,active
+John,Doe,john@example.com,DT001,2024-01-15,active
 ```
 
-**Historical Orders Import (`/api/data/import/historical-orders`)**
+**Historical Orders Import Format:**
 ```csv
 store_code,date,hour,order_count
 DT001,2024-12-01,10,15.5
-DT001,2024-12-01,11,22.3
-DT001,2024-12-01,12,28.7
 ```
 
-**Availability Import (`/api/data/import/availability`)**
-```csv
-employee_email,day_of_week,is_available,preferred_start,preferred_end
-john.doe@example.com,0,true,08:00,16:00
-john.doe@example.com,1,true,09:00,17:00
-john.doe@example.com,6,false,,
-```
-
-### Export Options
-
-- **Employees**: Export all employees or filter by store (CSV/Excel)
-- **Schedule**: Export a specific schedule with all shifts (CSV/Excel)
-- **Labor Report**: Export labor hours by date range with employee summaries (CSV/Excel)
-
-### Using the UI
-
-1. Navigate to **Manager Portal** > **Data**
-2. Select **Import Data** or **Export Data** tab
-3. Choose the data type and format
-4. For imports: Download template, fill in data, upload file
-5. For exports: Select options and click Export
+See the Data Management page in the Manager Portal for templates.
 
 ## Configuration
 
@@ -181,44 +145,84 @@ john.doe@example.com,6,false,,
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/picker_scheduler` |
-| `SECRET_KEY` | JWT secret key | Change in production! |
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `SECRET_KEY` | JWT signing key | Required |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration | 1440 (24 hours) |
 
 ## Labor Rules
 
 The system enforces these compliance rules:
 
-- **Weekly Maximum**: 44 hours per week
-- **Daily Maximum**: 8 hours per day
-- **Work Pattern**: 6 days on, 1 day off
-- **Breaks**: 30 min for 8hr shifts, 1 hr for 9hr shifts
+| Rule | Limit |
+|------|-------|
+| Weekly Maximum | 44 hours |
+| Daily Maximum | 8 hours |
+| Minimum Days Off | 1 per week |
+| Break (8hr shift) | 30 minutes |
+| Break (9hr shift) | 1 hour |
 
-## Database Migrations
+## Development
+
+### Database Migrations
 
 ```bash
-# Create a new migration
+# Create new migration
 alembic revision --autogenerate -m "Description"
 
 # Apply migrations
 alembic upgrade head
 
-# Rollback one migration
+# Rollback
 alembic downgrade -1
 ```
 
-## Testing
+### Running Tests
 
 ```bash
-# Backend tests
-cd backend
-pytest
+# Backend
+cd backend && pytest
 
-# Frontend tests
-cd frontend
-npm test
+# Frontend
+cd frontend && npm test
 ```
+
+## Deployment
+
+### AWS (Recommended)
+
+The system includes Terraform configuration for AWS deployment:
+- EC2 instance for application
+- RDS PostgreSQL database
+- Automated backups
+- GitHub Actions auto-deploy
+
+```bash
+cd infrastructure
+terraform init
+terraform apply
+```
+
+See [Deployment Guide](docs/deployment.md) for details.
+
+### Cost Estimate (AWS Free Tier)
+
+| Resource | Free Tier |
+|----------|-----------|
+| EC2 t3.micro | 750 hours/month |
+| RDS db.t3.micro | 750 hours/month |
+| Storage | 30 GB EBS + 20 GB RDS |
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make changes with tests
+4. Submit a pull request
 
 ## License
 
-Proprietary - All rights reserved
+Proprietary - All rights reserved.
+
+---
+
+For support or questions, contact your system administrator.
