@@ -46,31 +46,37 @@ The Picker Scheduling System automates the creation of work schedules for 50+ em
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Node.js 18+ (for local frontend development)
-- Python 3.11+ (for local backend development)
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 14+
 
-### Using Docker (Recommended)
+### Local Development
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/picker-scheduler.git
 cd picker-scheduler
 
-# Start all services
-docker-compose up -d
+# Setup Backend
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env      # Edit with your database URL
+alembic upgrade head
+uvicorn app.main:app --reload
 
-# Run database migrations
-docker-compose exec backend alembic upgrade head
+# Setup Frontend (in another terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
 Access the application:
 - **Frontend**: http://localhost:3000
 - **API Docs**: http://localhost:8000/docs
 
-### Local Development
-
-See the [Deployment Guide](docs/deployment.md) for detailed local setup instructions.
+See the [Deployment Guide](docs/deployment.md) for production deployment instructions.
 
 ## Documentation
 

@@ -5,7 +5,7 @@ This guide covers deploying the Picker Scheduling System to production environme
 ## Deployment Options
 
 1. **AWS (Recommended)** - EC2 + RDS using Terraform
-2. **Docker Compose** - Self-hosted on any server
+2. **Manual Server** - Any Linux server with PostgreSQL
 3. **Local Development** - For testing and development
 
 ---
@@ -163,7 +163,7 @@ npm run build
 sudo systemctl restart picker-backend picker-frontend
 ```
 
-**Or push to main** for auto-deploy.
+**Or push to main** for auto-deploy via GitHub Actions.
 
 ### Destroying Infrastructure
 
@@ -176,116 +176,166 @@ This removes all AWS resources.
 
 ---
 
-## Docker Compose Deployment
+## Manual Server Deployment
+
+For deploying to any Linux server (Ubuntu, Amazon Linux, etc.).
 
 ### Prerequisites
 
-- Docker and Docker Compose installed
-- Server with 2GB+ RAM
+- Linux server with 2GB+ RAM
+- PostgreSQL 14+ (local or remote)
+- Python 3.11+
+- Node.js 18+
+- Git
 
-### Step 1: Clone Repository
+### Step 1: Install Dependencies
 
+**Amazon Linux 2023:**
 ```bash
-git clone https://github.com/your-username/picker-scheduler.git
-cd picker-scheduler
+# Update system
+sudo dnf update -y
+
+# Install Python 3.11
+sudo dnf install -y python3.11 python3.11-pip python3.11-devel
+
+# Install Node.js 18
+curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+sudo dnf install -y nodejs
+
+# Install PostgreSQL client and build tools
+sudo dnf install -y postgresql-devel gcc git
 ```
 
-### Step 2: Configure Environment
-
+**Ubuntu 22.04:**
 ```bash
-# Backend
-cp backend/.env.example backend/.env
-nano backend/.env
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Python 3.11
+sudo apt install -y python3.11 python3.11-venv python3.11-dev
+
+# Install Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Install PostgreSQL client and build tools
+sudo apt install -y libpq-dev build-essential git
 ```
 
-**.env:**
+### Step 2: Clone Repository
+
+```bash
+sudo mkdir -p /opt/picker-scheduler
+sudo chown $USER:$USER /opt/picker-scheduler
+git clone https://github.com/your-username/picker-scheduler.git /opt/picker-scheduler
+cd /opt/picker-scheduler
+```
+
+### Step 3: Setup Backend
+
+```bash
+cd /opt/picker-scheduler/backend
+
+# Create virtual environment
+python3.11 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+nano .env  # Edit with your database URL and secret key
+```
+
+**.env file:**
 ```env
-DATABASE_URL=postgresql://postgres:postgres@db:5432/picker_scheduler
-SECRET_KEY=your-secret-key-change-in-production
+DATABASE_URL=postgresql://user:password@host:5432/picker_scheduler
+SECRET_KEY=your-secure-secret-key-here
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
-### Step 3: Build and Start
-
 ```bash
-# Build containers
-docker-compose build
+# Run migrations
+alembic upgrade head
 
-# Start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
+deactivate
 ```
 
-### Step 4: Run Migrations
+### Step 4: Setup Frontend
 
 ```bash
-docker-compose exec backend alembic upgrade head
+cd /opt/picker-scheduler/frontend
+
+# Install dependencies
+npm install
+
+# Build for production
+npm run build
 ```
 
-### Step 5: Access Application
+### Step 5: Create Systemd Services
 
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+**Backend Service:**
+```bash
+sudo tee /etc/systemd/system/picker-backend.service > /dev/null <<EOF
+[Unit]
+Description=Picker Scheduler Backend
+After=network.target
 
-### Docker Compose Services
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=/opt/picker-scheduler/backend
+Environment=PATH=/opt/picker-scheduler/backend/venv/bin
+ExecStart=/opt/picker-scheduler/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
 
-**docker-compose.yml:**
-```yaml
-version: '3.8'
-
-services:
-  db:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: picker_scheduler
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/picker_scheduler
-      SECRET_KEY: change-me-in-production
-    depends_on:
-      - db
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    depends_on:
-      - backend
-
-volumes:
-  postgres_data:
+[Install]
+WantedBy=multi-user.target
+EOF
 ```
 
-### Managing Docker Deployment
+**Frontend Service:**
+```bash
+sudo tee /etc/systemd/system/picker-frontend.service > /dev/null <<EOF
+[Unit]
+Description=Picker Scheduler Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=/opt/picker-scheduler/frontend
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+### Step 6: Start Services
 
 ```bash
-# Stop services
-docker-compose down
+sudo systemctl daemon-reload
+sudo systemctl enable picker-backend picker-frontend
+sudo systemctl start picker-backend picker-frontend
+```
 
-# Restart services
-docker-compose restart
+### Step 7: Verify
 
-# View logs
-docker-compose logs backend
-docker-compose logs frontend
+```bash
+# Check status
+sudo systemctl status picker-backend
+sudo systemctl status picker-frontend
 
-# Shell into container
-docker-compose exec backend bash
+# Test endpoints
+curl http://localhost:8000/health
+curl http://localhost:3000
 ```
 
 ---
@@ -296,19 +346,19 @@ docker-compose exec backend bash
 
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 14+ (or Docker)
+- PostgreSQL 14+ (local installation or remote)
 
-### Step 1: Start Database
+### Step 1: Setup Database
 
-**Option A: Docker**
+**Option A: Local PostgreSQL**
 ```bash
-docker-compose up -d db
-```
-
-**Option B: Local PostgreSQL**
-```bash
+# Create database
 createdb picker_scheduler
 ```
+
+**Option B: Use Remote Database**
+- Use an existing PostgreSQL instance
+- Update connection string in .env
 
 ### Step 2: Backend Setup
 
@@ -363,13 +413,12 @@ npm run dev
 | `SECRET_KEY` | JWT signing key | Required (generate secure key) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration | 1440 (24 hours) |
 | `APP_NAME` | Application name | Picker Scheduler |
-| `DEBUG` | Enable debug mode | false |
 
 ### Frontend
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | Auto-detected |
+| `NEXT_PUBLIC_API_URL` | Backend API URL | Auto-detected from browser |
 
 ---
 
@@ -378,6 +427,9 @@ npm run dev
 ### Running Migrations
 
 ```bash
+cd backend
+source venv/bin/activate
+
 # Apply all migrations
 alembic upgrade head
 
@@ -402,14 +454,14 @@ aws rds create-db-snapshot \
   --db-snapshot-identifier manual-backup-$(date +%Y%m%d)
 ```
 
-### Database Backup (Docker)
+### Database Backup (Local PostgreSQL)
 
 ```bash
 # Backup
-docker-compose exec db pg_dump -U postgres picker_scheduler > backup.sql
+pg_dump picker_scheduler > backup.sql
 
 # Restore
-docker-compose exec -T db psql -U postgres picker_scheduler < backup.sql
+psql picker_scheduler < backup.sql
 ```
 
 ---
@@ -426,9 +478,37 @@ docker-compose exec -T db psql -U postgres picker_scheduler < backup.sql
 ### Option 2: Nginx + Let's Encrypt
 
 ```bash
-# Install Certbot
-sudo dnf install certbot python3-certbot-nginx
+# Install Nginx and Certbot
+sudo dnf install nginx certbot python3-certbot-nginx
 
+# Configure Nginx as reverse proxy
+sudo nano /etc/nginx/conf.d/picker-scheduler.conf
+```
+
+**Nginx configuration:**
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /api {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+```bash
 # Get certificate
 sudo certbot --nginx -d your-domain.com
 
@@ -439,7 +519,7 @@ sudo systemctl enable certbot-renew.timer
 ### Option 3: Cloudflare Proxy
 
 1. Add domain to Cloudflare
-2. Configure DNS records
+2. Configure DNS records pointing to your server IP
 3. Enable "Full" SSL mode
 4. Cloudflare handles SSL termination
 
@@ -458,6 +538,9 @@ sudo journalctl -u picker-frontend -f
 
 # Combined logs
 sudo journalctl -u 'picker-*' -f
+
+# Last 100 lines
+sudo journalctl -u picker-backend -n 100
 ```
 
 ### Health Checks
@@ -470,12 +553,23 @@ curl http://localhost:8000/health
 curl http://localhost:3000
 ```
 
-### CloudWatch (AWS)
+### Service Management
 
-Enable CloudWatch agent for:
-- CPU/Memory metrics
-- Disk usage
-- Custom application metrics
+```bash
+# Check status
+sudo systemctl status picker-backend
+sudo systemctl status picker-frontend
+
+# Restart services
+sudo systemctl restart picker-backend
+sudo systemctl restart picker-frontend
+
+# Stop services
+sudo systemctl stop picker-backend picker-frontend
+
+# Start services
+sudo systemctl start picker-backend picker-frontend
+```
 
 ---
 
@@ -499,10 +593,12 @@ sudo lsof -i :3000
 
 ```bash
 # Test connection
-psql -h <RDS_ENDPOINT> -U picker_admin -d picker_scheduler
+psql -h <HOST> -U <USER> -d picker_scheduler
 
-# Check security group allows connection
-aws ec2 describe-security-groups --group-ids <SG_ID>
+# Check if PostgreSQL is running
+sudo systemctl status postgresql
+
+# For RDS, verify security group allows connection from EC2
 ```
 
 ### Frontend Build Fails
@@ -512,6 +608,7 @@ aws ec2 describe-security-groups --group-ids <SG_ID>
 node --version  # Should be 18+
 
 # Clear cache and rebuild
+cd frontend
 rm -rf .next node_modules
 npm install
 npm run build
@@ -519,28 +616,41 @@ npm run build
 
 ### Memory Issues
 
-If running t3.micro (1GB RAM):
+If running on a small instance (1GB RAM):
 ```bash
 # Add swap space
 sudo dd if=/dev/zero of=/swapfile bs=1M count=1024
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
+
+# Make permanent
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
-Consider upgrading to t3.small (2GB RAM) for production.
+Recommendation: Use t3.small (2GB RAM) for production.
+
+### Permission Issues
+
+```bash
+# Fix ownership
+sudo chown -R $USER:$USER /opt/picker-scheduler
+
+# Fix Python venv permissions
+chmod -R 755 /opt/picker-scheduler/backend/venv
+```
 
 ---
 
 ## Security Checklist
 
 - [ ] Change default database password
-- [ ] Generate secure SECRET_KEY
-- [ ] Configure CORS for production domains
+- [ ] Generate secure SECRET_KEY (use `openssl rand -hex 32`)
+- [ ] Configure CORS for production domains only
 - [ ] Enable HTTPS/SSL
 - [ ] Set up firewall rules (security groups)
 - [ ] Enable RDS encryption at rest
-- [ ] Disable debug mode in production
 - [ ] Set up regular backups
 - [ ] Configure log retention
-- [ ] Review IAM permissions
+- [ ] Review IAM permissions (principle of least privilege)
+- [ ] Keep system packages updated
